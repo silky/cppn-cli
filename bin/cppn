@@ -34,8 +34,9 @@ def e(ctx):
 @click.option("--height", required=True, type=int)
 @click.option("--width",  required=True, type=int)
 @click.option("--out",    required=True, type=str)
+@click.option("--server", type=str, default=None)
 @click.option("--z",      type=str)
-def sample(ctx, checkpoint_dir, height, width, out, z=None):
+def sample(ctx, checkpoint_dir, height, width, out, server, z=None):
     with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
         config_data = pickle.load(f)
 
@@ -52,7 +53,8 @@ def sample(ctx, checkpoint_dir, height, width, out, z=None):
     config = ctx.obj["config"]
     net    = c.build_model(config, height, width)
 
-    with tf.Session() as sess:
+    if server: tf.Session.reset(server)
+    with tf.Session(server) as sess:
         saver      = tf.train.Saver()
         checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
         saver.restore(sess, checkpoint)
@@ -69,7 +71,8 @@ def sample(ctx, checkpoint_dir, height, width, out, z=None):
 @click.option("--norms",   default=None, type=str)
 @click.option("--colours", default=3)
 @click.option("--out", required=True, type=str)
-def n(ctx, net_size, z_dim, activations, norms, colours, out):
+@click.option("--server", type=str, default=None)
+def n(ctx, net_size, z_dim, activations, norms, colours, out, server):
     activations = [ AFM[f] for f in activations.split(',') ]
     norms       = norms.split(',') if norms else []
 
@@ -83,6 +86,7 @@ def n(ctx, net_size, z_dim, activations, norms, colours, out):
 
     ctx.obj["config"] = config
     ctx.obj["out"]    = out
+    ctx.obj["server"] = server
 
 
 @n.command()
@@ -92,11 +96,13 @@ def n(ctx, net_size, z_dim, activations, norms, colours, out):
 def generate(ctx, height, width):
     config = ctx.obj["config"]
     out    = ctx.obj["out"]
+    server = ctx.obj["server"]
 
     net = c.build_model(config, height, width)
     z = np.random.normal(-1, 1, size=config.z_dim)
 
-    with tf.Session() as sess:
+    if server: tf.Session.reset(server)
+    with tf.Session(server) as sess:
         sess.run(tf.global_variables_initializer())
         ys = c.forward(sess, config, net, z, height, width)
 
@@ -115,6 +121,7 @@ def generate(ctx, height, width):
 def match(ctx, image, steps, logdir, log_every, lr):
     config = ctx.obj["config"]
     out    = ctx.obj["out"]
+    server = ctx.obj["server"]
     loaded = sp.imread(image, mode="RGB") / 255.0
 
     (height, width, colours) = loaded.shape
@@ -129,11 +136,12 @@ def match(ctx, image, steps, logdir, log_every, lr):
     to_match = loaded.reshape( (-1, colours) )
     xs       = c.get_input_data(config, height, width)
 
-    merged        = tf.summary.merge_all()
     id_           = str(uuid.uuid1())[:8]
+    merged        = tf.summary.merge_all()
     summaries_dir = f"{logdir}/{id_}"
 
-    with tf.Session() as sess:
+    if server: tf.Session.reset(server)
+    with tf.Session(server) as sess:
         print(f"Summaries dir: {summaries_dir}")
         writer = tf.summary.FileWriter(f"{summaries_dir}/train", sess.graph)
         saver  = tf.train.Saver()
