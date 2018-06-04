@@ -4,12 +4,13 @@ bleach==1.5.0
 certifi==2016.2.28
 click==6.7
 cloudpickle==0.5.3
-## !! Could not determine repository location
-cppn-cli==1
+-e git+git@github.com:silky/cppn-cli.git@6e0ad55852efeb2b3d2767f9f6c37ad73f6eafa7#egg=cppn_cli
 cycler==0.10.0
 dask==0.17.5
 decorator==4.3.0
 gast==0.2.0
+GPy==1.9.2
+GPyOpt==1.2.5
 grpcio==1.12.0
 html5lib==0.9999999
 kiwisolver==1.0.1
@@ -17,6 +18,7 @@ Markdown==2.6.11
 matplotlib==2.2.2
 networkx==2.1
 numpy==1.14.3
+paramz==0.9.1
 Pillow==5.1.0
 protobuf==3.5.2.post1
 pyparsing==2.2.0

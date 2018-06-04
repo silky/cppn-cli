@@ -7,6 +7,7 @@ import tensorflow as tf
 import scipy.misc as sp
 import uuid
 import pickle
+import json
 from tensorflow.core.protobuf import config_pb2
 
 
@@ -179,6 +180,9 @@ def match(ctx, image, steps, logdir, log_every, lr):
                 saver.save(sess, f"{summaries_dir}/{k}.ckpt")
 
         ys = c.forward(sess, config, net, z, height, width)
+
+    with open("./result.json", "w") as f:
+        json.dump({"loss": float(loss)}, f)
 
     ys = np.reshape(ys, (height, width, colours))
     sp.imsave(out, ys)
