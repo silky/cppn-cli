@@ -7,6 +7,7 @@ import tensorflow as tf
 import scipy.misc as sp
 import uuid
 import pickle
+from tensorflow.core.protobuf import config_pb2
 
 
 AFM = { "tanh":     tf.nn.tanh
@@ -14,6 +15,11 @@ AFM = { "tanh":     tf.nn.tanh
       , "relu":     tf.nn.relu
       , "softplus": tf.nn.softplus
       }
+
+
+def make_session (server):
+    config = config_pb2.ConfigProto(isolate_session_state=True)
+    return tf.Session(server, config=config)
 
 
 @click.group()
@@ -53,8 +59,7 @@ def sample(ctx, checkpoint_dir, height, width, out, server, z=None):
     config = ctx.obj["config"]
     net    = c.build_model(config, height, width)
 
-    if server: tf.Session.reset(server)
-    with tf.Session(server) as sess:
+    with make_session(server) as sess:
         saver      = tf.train.Saver()
         checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
         saver.restore(sess, checkpoint)
@@ -101,13 +106,13 @@ def generate(ctx, height, width):
     net = c.build_model(config, height, width)
     z = np.random.normal(-1, 1, size=config.z_dim)
 
-    if server: tf.Session.reset(server)
-    with tf.Session(server) as sess:
+    with make_session(server) as sess:
         sess.run(tf.global_variables_initializer())
         ys = c.forward(sess, config, net, z, height, width)
 
     print(f"{z}")
     sp.imsave(out, ys)
+
 
 
 @n.command()
@@ -140,8 +145,7 @@ def match(ctx, image, steps, logdir, log_every, lr):
     merged        = tf.summary.merge_all()
     summaries_dir = f"{logdir}/{id_}"
 
-    if server: tf.Session.reset(server)
-    with tf.Session(server) as sess:
+    with make_session(server) as sess:
         print(f"Summaries dir: {summaries_dir}")
         writer = tf.summary.FileWriter(f"{summaries_dir}/train", sess.graph)
         saver  = tf.train.Saver()
