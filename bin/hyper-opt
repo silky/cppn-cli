@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+
+import GPy
+import GPyOpt
+import subprocess
+import click
+import json
+
+@click.group()
+def cli ():
+    ...
+
+ACTIVATIONS = [ "tanh", "relu" ]
+PAIRS       = [ [x,y] for x in ACTIVATIONS for y in ACTIVATIONS ]
+
+@cli.command()
+@click.option("--server", type=str)
+def optimise (server):
+
+    f = mk_func(server)
+    
+    # {"name": "lr", "type": "continuous", "domain":  (-5, -2) }
+    #
+    # Learned that the learning rate should be 10**(-2).
+    #
+    bounds = [ {"name": "net_size", "type": "discrete", "domain": range(10, 128) }
+             , {"name": "z_dim", "type": "discrete", "domain": range(2, 20) }
+             ]
+
+    for i, p in enumerate(PAIRS):
+        bounds.append( { "name": f"x{i}"
+                       , "type": "discrete"
+                       , "domain": range(0, 4) } 
+                     )
+
+    bounds.append( { "name": "x_last"
+                    , "type": "discrete"
+                    , "domain": range(len(ACTIVATIONS) + 1) }
+                     )
+
+    max_iter = 50
+    prob = GPyOpt.methods.BayesianOptimization(f, bounds)
+    prob.run_optimization(max_iter) 
+
+    print("Optimal Values!")
+    print(prob.x_opt)
+
+
+def mk_func (server):
+    def func (x):
+
+        # Locked-in learning rate!
+        lr          = -2
+        net_size    = x[0][0]
+        z_dim       = x[0][1]
+
+        activations = []
+        for i, p in enumerate(PAIRS):
+            count = x[0][2 + i]
+            activations += (int(count) * p)
+
+        if len(activations) == 0:
+            print("Can't run with no activations.")
+            return 1000
+
+        last_activation = x[0][-1]
+        if last_activation > 0:
+            activations.append( ACTIVATIONS[int(last_activation) - 1] )
+
+        steps = 500
+
+        process = subprocess.Popen(
+                    ["cppn"
+                    , "new"
+                    , "--server", server
+                    , "--net_size", str(int(net_size))
+                    , "--z_dim", str(int(z_dim))
+                    , "--activations", ",".join(activations)
+                    , "--out", "opt-image.png"
+                    , "match"
+                    , "--image", "/home/noon/tmp/audio-shop/square.png"
+                    , "--steps", str(steps)
+                    , "--lr", str(10**lr)
+                    ])
+
+        process.communicate()
+
+        assert process.returncode == 0, "Process failed!"
+
+        with open("result.json", "r") as f:
+            data = json.load(f)
+            return data['loss'] 
+
+    return func
+
+
+if __name__ == "__main__":
+    cli()

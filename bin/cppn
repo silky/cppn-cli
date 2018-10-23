@@ -1,26 +1,20 @@
 #!/usr/bin/env python
 
+# "jq" hacking to make a large json file
+# with all the data:
+#
+#  1. for i in *.png.json; do jq '. + {"from_file": input_filename}' $i > $i-2.json; done;
+#  2. jq -s '[.[]]' *-2.json > all.json                                                   
+
+import cppn.model as model
+import cppn.ops   as ops
+from cppn import cppn
+
 import click
-import cppn.model as c
-import numpy      as np
-import tensorflow as tf
-import scipy.misc as sp
-import uuid
+import numpy as np
 import pickle
+import scipy.misc as sp
 import json
-from tensorflow.core.protobuf import config_pb2
-
-
-AFM = { "tanh":     tf.nn.tanh
-      , "selu":     tf.nn.selu
-      , "relu":     tf.nn.relu
-      , "softplus": tf.nn.softplus
-      }
-
-
-def make_session (server):
-    config = config_pb2.ConfigProto(isolate_session_state=True)
-    return tf.Session(server, config=config)
 
 
 @click.group()
@@ -31,42 +25,8 @@ def cli(ctx):
 
 @cli.group()
 @click.pass_context
-def e(ctx):
+def existing(ctx):
     ...
-
-
-@e.command()
-@click.pass_context
-@click.option("--checkpoint_dir", type=str, required=True)
-@click.option("--height", required=True, type=int)
-@click.option("--width",  required=True, type=int)
-@click.option("--out",    required=True, type=str)
-@click.option("--server", type=str, default=None)
-@click.option("--z",      type=str)
-def sample(ctx, checkpoint_dir, height, width, out, server, z=None):
-    with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
-        config_data = pickle.load(f)
-
-    p = config_data["params"]
-
-    if z is not None:
-        z = np.array( [ float(n) for n in z.split(',') ] )
-    else:
-        z = config_data["z"]
-    
-    # Crazy!
-    n.callback(**config_data["params"])
-     
-    config = ctx.obj["config"]
-    net    = c.build_model(config, height, width)
-
-    with make_session(server) as sess:
-        saver      = tf.train.Saver()
-        checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
-        saver.restore(sess, checkpoint)
-        ys = c.forward(sess, config, net, z, height, width)
-
-    sp.imsave(out, ys)
 
 
 @cli.group()
@@ -76,13 +36,13 @@ def sample(ctx, checkpoint_dir, height, width, out, server, z=None):
 @click.option("--activations", type=str)
 @click.option("--norms",   default=None, type=str)
 @click.option("--colours", default=3)
-@click.option("--out", required=True, type=str)
+@click.option("--out", type=str)
 @click.option("--server", type=str, default=None)
-def n(ctx, net_size, z_dim, activations, norms, colours, out, server):
-    activations = [ AFM[f] for f in activations.split(',') ]
+def new(ctx, net_size, z_dim, activations, norms, colours, out, server):
+    activations = [ ops.AFM[f] for f in activations.split(',') ]
     norms       = norms.split(',') if norms else []
 
-    config  = c.Config( net_size    = net_size
+    config  = model.Config( net_size    = net_size
                       , input_size  = 2 + len(norms) + z_dim
                       , z_dim       = z_dim
                       , activations = activations
@@ -95,97 +55,103 @@ def n(ctx, net_size, z_dim, activations, norms, colours, out, server):
     ctx.obj["server"] = server
 
 
-@n.command()
+
+@existing.command()
+@click.pass_context
+@click.option("--checkpoint_dir", type=str, required=True)
+@click.option("--server", type=str, default=None)
+@click.option("--image", help="Path of the image we're attempting to match.", 
+        required=True)
+@click.option("--steps",  default=4000)
+@click.option("--base_logdir", default="logs")
+@click.option("--log_every", default=500)
+@click.option("--lr", default=0.001)
+def keep_training(ctx, checkpoint_dir, server, image, steps, base_logdir, log_every, lr):
+    """ Continue training some existing model.
+    
+        This will use the configuration data from the checkpoint directory.
+    """
+    with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
+        config_data = pickle.load(f)
+
+    z = config_data["z"]
+
+    n.callback(**config_data["params"])
+     
+    config = ctx.obj["config"]
+
+    cppn.train_matching(ctx, image, z, server, config, lr, steps, log_every, base_logdir, checkpoint_dir)
+
+
+
+@existing.command()
+@click.pass_context
+@click.option("--checkpoint_dir", type=str, required=True)
+@click.option("--height",  required=True, type=int)
+@click.option("--width",   required=True, type=int)
+@click.option("--server",  type=str, default=None)
+@click.option("--out",     type=str, required=True)
+@click.option("--z",       type=str, default=None)
+@click.option("--z_steps", type=int, default=0)
+def sample(ctx, checkpoint_dir, height, width, server, out, z, z_steps):
+    """ Sample an image from an existing model.
+    """
+    with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
+        config_data = pickle.load(f)
+
+    new.callback(**config_data["params"])
+     
+    cppn.sample(ctx.obj["config"], checkpoint_dir, height, width, server, out, z, z_steps)
+
+
+
+@new.command()
 @click.pass_context
 @click.option("--height", required=True, type=int)
 @click.option("--width",  required=True, type=int)
-def generate(ctx, height, width):
+@click.option("--z",      type=str)
+def generate(ctx, height, width, z):
+    """ Just randomly generate a CPPN-style image.
+    """
     config = ctx.obj["config"]
     out    = ctx.obj["out"]
     server = ctx.obj["server"]
 
-    net = c.build_model(config, height, width)
-    z = np.random.normal(-1, 1, size=config.z_dim)
+    if z is not None:
+        z = np.array( [ float(n) for n in z.split(',') ] )
+    else:
+        z = np.random.normal(-1, 1, size=config.z_dim)
 
-    with make_session(server) as sess:
-        sess.run(tf.global_variables_initializer())
-        ys = c.forward(sess, config, net, z, height, width)
-
-    print(f"{z}")
-    sp.imsave(out, ys)
+    cppn.generate(z, height, width, config, out, server)
 
 
 
-@n.command()
+@new.command()
 @click.option("--image", help="Path of the image we're attempting to match.",
         required=True)
 @click.option("--steps",  default=4000)
-@click.option("--logdir", default="logs")
+@click.option("--base_logdir", default="logs")
 @click.option("--log_every", default=500)
 @click.option("--lr", default=0.001)
+@click.option("--sample_after", default=True)
 @click.pass_context
-def match(ctx, image, steps, logdir, log_every, lr):
+def match(ctx, image, steps, base_logdir, log_every, lr, sample_after):
+    """ Train a model to match a given image.
+    """
     config = ctx.obj["config"]
-    out    = ctx.obj["out"]
     server = ctx.obj["server"]
-    loaded = sp.imread(image, mode="RGB") / 255.0
 
-    (height, width, colours) = loaded.shape
+    z = np.random.normal(-1, 1, size=config.z_dim)
 
-    samples = 200
-    net     = c.build_model(config, samples, samples)
-    z       = np.random.normal(-1, 1, size=config.z_dim)
+    checkpoint_dir = cppn.train_matching(ctx, image, z, server, config, lr, steps, log_every, base_logdir)
 
-    optim      = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.6, beta2=0.9)
-    train_step = optim.minimize(net.loss)
+    if sample_after:
+        loaded           = sp.imread(image, mode="RGB")
+        height, width, _ = loaded.shape
 
-    to_match = loaded.reshape( (-1, colours) )
-    xs       = c.get_input_data(config, height, width)
+        out = ctx.obj["out"]
 
-    id_           = str(uuid.uuid1())[:8]
-    merged        = tf.summary.merge_all()
-    summaries_dir = f"{logdir}/{id_}"
-
-    with make_session(server) as sess:
-        print(f"Summaries dir: {summaries_dir}")
-        writer = tf.summary.FileWriter(f"{summaries_dir}/train", sess.graph)
-        saver  = tf.train.Saver()
-
-        with open(f"{summaries_dir}/config.pkl", "wb") as f:
-            # Get the params of the parent, which defines the model.
-            data = {}
-            data["params"] = ctx.parent.params
-            data["z"]      = z
-            pickle.dump(data, f)
-
-        sess.run(tf.global_variables_initializer())
-
-        for k in range(steps):
-            b = np.random.randint( height*width, size=(samples * samples) )
-            
-            data = { net.to_match: to_match[b]
-                   , net.xs      : xs[b]
-                   , net.z       : z
-                   }
-
-            _, loss = sess.run( [ train_step, net.loss ], feed_dict=data )
-
-            if k % log_every == 0 or (k == steps - 1):
-                # TODO: make this a bit more workable; the image it shows in
-                # the summary, when we run this, is just fully random, because
-                # the batch is random.
-                print(f"Step {k}, Loss: {loss}")
-                summaries = sess.run(merged, feed_dict=data)
-                writer.add_summary(summaries, k)
-                saver.save(sess, f"{summaries_dir}/{k}.ckpt")
-
-        ys = c.forward(sess, config, net, z, height, width)
-
-    with open("./result.json", "w") as f:
-        json.dump({"loss": float(loss)}, f)
-
-    ys = np.reshape(ys, (height, width, colours))
-    sp.imsave(out, ys)
+        cppn.sample(config, checkpoint_dir, height, width, server, out, z, 0)
 
 
 
