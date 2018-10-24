@@ -75,13 +75,13 @@ Produces:
 ![](./images/matched-colour1.png)
 
 
-
+---
 
 #### Some good models
 
-Found via `hyper-opt` with a
+Found via `hyper-opt`.
 
-With: `max_ier = 10, steps=500`
+With: `max_iter = 10, steps=500`
 
 ```
 net_size = 41
