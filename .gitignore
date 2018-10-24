@@ -2,3 +2,5 @@
 *.egg-info/
 logs/*
 scripts/*
+out/*
+result.json

@@ -67,9 +67,9 @@ def build_model (config, height, width):
 
 
 def get_input_data (config, height, width):
-    # Note: Changing the numbers here can have interesting results
-    x = np.linspace(-1, 1, num = width)
-    y = np.linspace(-1, 1, num = height)
+    buffer = 0 # config["buffer"]
+    x = np.linspace(-1 - buffer, 1 + buffer, num = width)
+    y = np.linspace(-1 - buffer, 1 + buffer, num = height)
     return get_input_data_(config, x, y)
 
 
@@ -125,11 +125,12 @@ def stitch_together (yss, rows, columns):
 
 def forward (sess, config, model, z, height, width):
     max_size = 90
+    buffer   = 0
     if (width * height) > (max_size * max_size):
         # We just want to call "get_input_data_" with a subset
         # of x's and y's.
-        start = -1
-        end   = 1
+        start = -1 - buffer
+        end   =  1 + buffer
         sw    = math.ceil(width  / max_size)
         sh    = math.ceil(height / max_size)
         x     = np.linspace(start, end, num = width)
