@@ -75,6 +75,9 @@ Produces:
 ![](./images/matched-colour1.png)
 
 
+(See also the `sample` command to sample from a previously-trained model.)
+
+
 ---
 
 #### Some good models
