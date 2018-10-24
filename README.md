@@ -18,10 +18,17 @@ Set up some kind of Python environment ...
 conda create -n cppn-cli python=3
 ```
 
-Install
+Install your TensorFlow version
 
 ```
-python setup.py install
+conda install -c conda-forge tensorflow-gpu # GPU
+conda install -c conda-forge tensorflow     # No GPU
+```
+
+Install in dev mode
+
+```
+python setup.py develop
 ```
 
 Done! The executable named `cppn` should now be on your path.
