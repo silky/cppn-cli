@@ -66,10 +66,9 @@ def build_model (config, height, width):
     return model
 
 
-def get_input_data (config, height, width):
-    buffer = 0 # config["buffer"]
-    x = np.linspace(-1 - buffer, 1 + buffer, num = width)
-    y = np.linspace(-1 - buffer, 1 + buffer, num = height)
+def get_input_data (config, height, width, start, end):
+    x = np.linspace(start, end, num = width)
+    y = np.linspace(start, end, num = height)
     return get_input_data_(config, x, y)
 
 
@@ -123,14 +122,14 @@ def stitch_together (yss, rows, columns):
     return result
 
 
-def forward (sess, config, model, z, height, width):
+def forward (sess, config, model, z, height, width, border=0):
     max_size = 90
-    buffer   = 0
+    start    = -1 - border
+    end      = 1 + border
+
     if (width * height) > (max_size * max_size):
         # We just want to call "get_input_data_" with a subset
         # of x's and y's.
-        start = -1 - buffer
-        end   =  1 + buffer
         sw    = math.ceil(width  / max_size)
         sh    = math.ceil(height / max_size)
         x     = np.linspace(start, end, num = width)
@@ -159,7 +158,7 @@ def forward (sess, config, model, z, height, width):
      
         return stitch_together(results, sh, sw)
     else:
-        xs = get_input_data(config, height, width)
+        xs = get_input_data(config, height, width, start, end)
         ys = forward_(sess, config, model, z, height, width, xs)
         ys = np.reshape(ys, (height, width, config.colours))
         return ys

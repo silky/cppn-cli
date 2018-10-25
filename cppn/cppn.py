@@ -29,7 +29,7 @@ def generate (z, height, width, config, out, server):
 
 
 
-def sample (config, checkpoint_dir, height, width, server, out, z, z_steps=0):
+def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, border, border_steps):
     """ Sample from a pre-trained model and emit an image.
     """
     with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
@@ -62,17 +62,22 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps=0):
         saver.restore(sess, checkpoint)
 
         if z_steps > 0:
-            frames = [ model.forward(sess, config, net, z_, height, width) for z_ in zs ]
+            frames = [ model.forward(sess, config, net, z_, height, width, border) for z_ in zs ]
         else:
-            ys = model.forward(sess, config, net, z, height, width)
+            if border_steps > 0:
+                borders = np.linspace(0, border, num = border_steps)
+                frames = [ model.forward(sess, config, net, z, height, width, b) for b in borders ]
+                frames = reversed(frames)
+            else:
+                ys = model.forward(sess, config, net, z, height, width, border=border)
 
     with open(f"{out}.json", "w") as f:
         config_data["z"] = config_data["z"].tolist()
         json.dump(config_data, f)
 
-    if z_steps > 0:
+    if z_steps > 0 or border_steps > 0:
         for k, ys in enumerate(frames):
-            sp.imsave(out + "/%05d.png" % k, ys)
+            sp.imsave(out + "/%05d.png" % (k+40), ys)
     else:
         sp.imsave(out, ys)
 

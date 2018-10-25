@@ -85,6 +85,18 @@ Produces:
 (See also the `sample` command to sample from a previously-trained model.)
 
 
+### Fun hacks - Video Brane
+
+We can make cool videos: [Video-Brane](./images/video-brane.mp4).
+
+This was done in a few steps:
+
+1. From the trained model above,
+2. I ran `sample` with `z_steps=40`, and `border=7`.
+3. Then, I again sampled, with `border=7` and `border_steps=20`
+4. Then I merged all the images into a video!
+
+
 ---
 
 #### Some good models
