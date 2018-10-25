@@ -66,8 +66,8 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
         else:
             if border_steps > 0:
                 borders = np.linspace(0, border, num = border_steps)
-                frames = [ model.forward(sess, config, net, z, height, width, b) for b in borders ]
-                frames = reversed(frames)
+                frames  = [ model.forward(sess, config, net, z, height, width, b) for b in borders ]
+                frames  = reversed(frames)
             else:
                 ys = model.forward(sess, config, net, z, height, width, border=border)
 
@@ -77,7 +77,7 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
 
     if z_steps > 0 or border_steps > 0:
         for k, ys in enumerate(frames):
-            sp.imsave(out + "/%05d.png" % (k+40), ys)
+            sp.imsave(out + "/%05d.png" % k, ys)
     else:
         sp.imsave(out, ys)
 
