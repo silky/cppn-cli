@@ -72,7 +72,8 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
                 ys = model.forward(sess, config, net, z, height, width, border=border)
 
     with open(f"{out}.json", "w") as f:
-        config_data["z"] = config_data["z"].tolist()
+        config_data["z"]              = config_data["z"].tolist()
+        config_data["checkpoint_dir"] = checkpoint_dir
         json.dump(config_data, f)
 
     if z_steps > 0 or border_steps > 0:
