@@ -1,4 +1,7 @@
-import cppn.model as model
+import cppn.model                   as model
+import cppn.relativistic_gan_model  as gan_model
+
+from cppn.data import make_dataset
 
 import os
 import scipy.misc as sp
@@ -17,7 +20,6 @@ def make_session (server):
 def generate (z, height, width, config, out, server):
     """ Just randomly generate a CPPN-style image.
     """
-
     net = model.build_model(config, height, width)
 
     with make_session(server) as sess:
@@ -83,6 +85,57 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
         sp.imsave(out, ys)
 
 
+def train_gan (ctx, directory, server, config, base_log_dir="logs", log_directory=None):
+    """ Train a CPPN on a given directory.
+    """
+    height     = 32
+    width      = 32
+    epochs     = 50
+    batch_size = 1
+    lr         = 0.001
+    log_every  = 1000
+
+    dataset    = make_dataset(directory, height, width)
+    dataset    = dataset.repeat(epochs)
+    dataset    = dataset.batch(batch_size)
+    iterator   = dataset.make_one_shot_iterator()
+    next_batch = iterator.get_next()
+
+    model = gan_model.build_model(config, height, width, next_batch, reset=False)
+
+    optim      = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
+    loss_op    = model.vae_loss + model.discrim_loss
+    train_step = optim.minimize(loss_op)
+
+    merged   = tf.summary.merge_all()
+
+    if log_directory is None:
+        id_           = str(uuid.uuid1())[:8]
+        summaries_dir = f"{base_log_dir}/{id_}"
+    else:
+        summaries_dir = log_directory
+
+    saver  = tf.train.Saver()
+
+    print(f"logs: {summaries_dir}")
+
+    k = 0
+    with tf.train.MonitoredTrainingSession() as sess:
+        print("Training ... ")
+        writer = tf.summary.FileWriter(f"{summaries_dir}/train", sess.graph)
+
+        while not sess.should_stop():
+            _, loss = sess.run( [ train_step, loss_op ] )
+            if k % log_every == 0:
+                summaries = sess.run(merged)
+                writer.add_summary(summaries, k)
+                print(f"{k}:  loss:", loss)
+            k += 1
+
+    print("Done!")
+
+
+
 def train_matching (ctx, image, z, server, config, lr, steps, log_every, base_log_dir, log_directory=None):
     """ Train a model to match the given input image.
     """
@@ -94,8 +147,11 @@ def train_matching (ctx, image, z, server, config, lr, steps, log_every, base_lo
     ratio     = samples_w / width
     samples_h = int(ratio * height)
 
+    start = -1
+    end   =  1
+
     net     = model.build_model(config, samples_h, samples_w)
-    xs      = model.get_input_data(config, height, width)
+    xs      = model.get_input_data(config, height, width, start, end)
 
     optim      = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.6, beta2=0.9)
     train_step = optim.minimize(net.loss)
@@ -103,7 +159,7 @@ def train_matching (ctx, image, z, server, config, lr, steps, log_every, base_lo
     to_match  = loaded.reshape( (-1, colours) )
     to_match_ = sp.imresize(loaded, (samples_h, samples_w, colours)).reshape((-1, colours))
 
-    img_xs   = model.get_input_data(config, samples_h, samples_w)
+    img_xs   = model.get_input_data(config, samples_h, samples_w, start, end)
     merged   = tf.summary.merge_all()
 
     if log_directory is None:

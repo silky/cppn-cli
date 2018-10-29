@@ -2,9 +2,7 @@ import tensorflow as tf
 import numpy      as np
 import math
 
-from collections                    import namedtuple
-from tensorflow.python.keras        import Sequential
-from tensorflow.python.keras.layers import Dense
+from collections import namedtuple
 
 
 Config = namedtuple("Config", 
@@ -24,22 +22,13 @@ Model = namedtuple("Model",
                     , "to_match"
                     ])
 
-                
 
-def build_model (config, height, width):
-    tf.reset_default_graph()
+def net (config, xs):
+    print(" Defining a net.")
+    print("  xs:", xs)
 
-    init       = tf.random_normal_initializer(mean=0, stddev=1)
-    coord_dims = config.input_size - config.z_dim
-    xs         = tf.placeholder(tf.float32, shape = [ None, coord_dims     ])
-    to_match   = tf.placeholder(tf.float32, shape = [ None, config.colours ])
-
-    # By default z will take on some random normal value.
-    z_val = np.random.normal(0, 1, size=config.z_dim)
-    z     = tf.Variable(z_val, dtype=tf.float32, trainable=False)
-
-    ones = tf.ones([tf.shape(xs)[0], 1])
-    h    = tf.concat([xs, ones * z], axis = 1)
+    h    = xs
+    init = tf.random_normal_initializer(mean=0, stddev=1, dtype=tf.float64)
 
     for func in config.activations:
         h = tf.layers.dense( h
@@ -48,12 +37,37 @@ def build_model (config, height, width):
                            , kernel_initializer = init
                            , bias_initializer   = init
                            )
+        print("  h:", h)
 
-    ys   = tf.layers.dense(h, config.colours, activation=tf.nn.sigmoid)
+    ys = tf.layers.dense(h, config.colours, activation=tf.nn.sigmoid)
+    return ys
+
+
+def build_model (config, height, width, reset=True):
+    if reset:
+        tf.reset_default_graph()
+
+    batch_size = 1 # We are specifically designed for one batch.
+    pixels     = width*height
+    init       = tf.random_normal_initializer(mean=0, stddev=1)
+    coord_dims = config.input_size - config.z_dim
+
+    xs         = tf.placeholder(tf.float32, shape = [ 1, None, coord_dims     ])
+    to_match   = tf.placeholder(tf.float32, shape = [ 1, None, config.colours ])
+
+    z_val = np.random.normal(0, 1, size=config.z_dim)
+    z     = tf.Variable(z_val, dtype=tf.float32, trainable=False)
+
+    pixel_ones = tf.ones([1, tf.shape(xs)[1], 1])
+    h          = tf.concat([xs, pixel_ones * z], axis = 2)
+
+    ys   = tf.map_fn(lambda xs: net(config, xs), h)
     loss = tf.losses.mean_squared_error(labels=to_match, predictions=ys)
 
-    tf.summary.image("ys",       tf.reshape(ys,       [1, height, width, config.colours]))
-    tf.summary.image("to_match", tf.reshape(to_match, [1, height, width, config.colours]))
+    # TODO: Because of the dependence on width/height here, this is wrong,
+    #       because actually it's dynamic.
+    tf.summary.image("ys",       tf.reshape(ys,       [batch_size, height, width, config.colours]))
+    tf.summary.image("to_match", tf.reshape(to_match, [batch_size, height, width, config.colours]))
     tf.summary.scalar("loss", loss)
     
     model = Model( xs       = xs
@@ -67,6 +81,14 @@ def build_model (config, height, width):
 
 
 def get_input_data (config, height, width, start, end):
+
+    print("Getting input data....")
+    print("  config:", config)
+    print("  height:", height)
+    print("   width:", width)
+    print("   start:", start)
+    print("     end:", end)
+
     x = np.linspace(start, end, num = width)
     y = np.linspace(start, end, num = height)
     return get_input_data_(config, x, y)
@@ -123,7 +145,7 @@ def stitch_together (yss, rows, columns):
 
 
 def forward (sess, config, model, z, height, width, border=0):
-    max_size = 90
+    max_size = 150
     start    = -1 - border
     end      = 1 + border
 
@@ -165,5 +187,6 @@ def forward (sess, config, model, z, height, width, border=0):
 
 
 def forward_ (sess, config, model, z, height, width, xs):
-    ys = sess.run( model.ys, feed_dict = { model.z: z, model.xs: xs } )
+    xss = [xs] # Note; we bundle up in a list here. Because of how
+    ys = sess.run( model.ys, feed_dict = { model.z: z, model.xs: xss } )
     return ys

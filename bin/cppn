@@ -6,8 +6,10 @@
 #  1. for i in *.png.json; do jq '. + {"from_file": input_filename}' $i > $i-2.json; done;
 #  2. jq -s '[.[]]' *-2.json > all.json                                                   
 
-import cppn.model as model
-import cppn.ops   as ops
+import cppn.model                   as model
+import cppn.relativistic_gan_model  as gan_model
+import cppn.ops                     as ops
+
 from cppn import cppn
 
 import click
@@ -136,6 +138,20 @@ def generate(ctx, height, width, z):
 
     cppn.generate(z, height, width, config, out, server)
 
+
+@new.command()
+@click.pass_context
+@click.option("--dir", required=True, help="The folder of images.")
+def gan(ctx, dir):
+    """ Train a CPPN-GAN on a folder of images.
+    """
+
+    config = ctx.obj["config"]
+    out    = ctx.obj["out"]
+    server = ctx.obj["server"]
+
+    print("Running GAN:", dir)
+    cppn.train_gan(ctx, dir, server, config)
 
 
 @new.command()
