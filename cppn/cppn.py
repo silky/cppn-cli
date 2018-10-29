@@ -88,12 +88,12 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
 def train_gan (ctx, directory, server, config, base_log_dir="logs", log_directory=None):
     """ Train a CPPN on a given directory.
     """
-    height     = 32
-    width      = 32
-    epochs     = 50
+    height     = 64
+    width      = 64
+    epochs     = 3
     batch_size = 1
     lr         = 0.001
-    log_every  = 1000
+    log_every  = 50
 
     dataset    = make_dataset(directory, height, width)
     dataset    = dataset.repeat(epochs)
