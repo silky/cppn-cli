@@ -142,7 +142,7 @@ def build_model (config, height, width, images, reset=True):
                                        - tf.exp(vae.z_log_sigma_sq), 1)
 
     reconstr_loss_m = tf.reduce_mean(reconstr_loss)  / pixels
-    latent_loss_m   = tf.reduce_mean(reconstr_loss)  / pixels
+    latent_loss_m   = tf.reduce_mean(latent_loss)    / pixels
     vae_loss        = reconstr_loss_m + latent_loss_m
 
     model = FullModel( vae          = vae
@@ -152,8 +152,7 @@ def build_model (config, height, width, images, reset=True):
                      )
 
 
-    tf.summary.image("in_images",       images)
-    tf.summary.image("gen_images",      gen_images)
+    tf.summary.image("images",          tf.concat([images, gen_images], axis=0)
     tf.summary.scalar("vae_loss",       vae_loss)
     tf.summary.scalar("reconstr_loss",  reconstr_loss_m)
     tf.summary.scalar("latent_loss",    latent_loss_m)
@@ -163,7 +162,7 @@ def build_model (config, height, width, images, reset=True):
     return model
 
 
-def build_vae (config, width, height, images, vae_size=128, z_dim=10):
+def build_vae (config, width, height, images, vae_size=256, z_dim=10):
     print("Building the VAE ...")
 
     with tf.variable_scope("vae"):
