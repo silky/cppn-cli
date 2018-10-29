@@ -9,6 +9,7 @@ FullModel = namedtuple("FullModel",
                        [ "vae"
                        , "gen_images"
                        , "discrim_loss"
+                       , "gen_loss"
                        , "vae_loss"
                        ])
 
@@ -71,8 +72,8 @@ def build_model (config, height, width, images, reset=True):
         end   =  1
 
         pixel_input = tf.map_fn(lambda _: cppn_model.get_input_data(config, height, width, start, end)
-                            , images
-                            )
+                               , images
+                               )
 
         print("pixel_input:", pixel_input)
 
@@ -104,12 +105,15 @@ def build_model (config, height, width, images, reset=True):
         xs = tf.concat([pixel_input, xs], axis = 2)
         print("xs:", xs)
         # Now:
-        #   xs.shape = [batch_size, pixels, colours + z_dim]
+        #   xs.shape = [batch_size, pixels, coords + z_dim]
 
+        # TODO: Could be suspicious.
         gen_images = tf.map_fn(lambda xs: cppn_model.net(config, xs), xs)
+        # gen_images = tf.nn.sigmoid(gen_images)
+        # gen_images = cppn_model.net(config, xs)
         print("gen_images:", gen_images)
         # Now:
-        #   ys.shape = [batch_size, pixels, colours]
+        #   gen_images.shape = [batch_size, pixels, colours]
 
         gen_images = tf.reshape(gen_images, [batch_size, height, width, config.colours])
         print("gen_images:", gen_images)
@@ -128,9 +132,20 @@ def build_model (config, height, width, images, reset=True):
         y      = tf.ones_like(y_real)
     
         # => Relativistic-GAN Losses
-        discrim_loss = ( tf.reduce_mean((y_real - tf.reduce_mean(y_fake) - y) ** 2)
-                    + tf.reduce_mean((y_fake - tf.reduce_mean(y_real) + y) ** 2)
-                    ) / 2
+        #
+        # Relativistic Standard GAN
+        discrim_loss = tf.losses.sigmoid_cross_entropy(y, y_real - y_fake)
+        gen_loss     = tf.losses.sigmoid_cross_entropy(y, y_fake - y_real)
+
+        #
+        # Relativistic Average LSGAN
+        # discrim_loss = ( tf.reduce_mean((y_real - tf.reduce_mean(y_fake) - y) ** 2)
+        #                + tf.reduce_mean((y_fake - tf.reduce_mean(y_real) + y) ** 2)
+        #                ) / 2
+
+        # gen_loss = ( tf.reduce_mean((y_real - tf.reduce_mean(y_fake) + y) ** 2)
+        #            + tf.reduce_mean((y_fake - tf.reduce_mean(y_real) - y) ** 2)
+        #            ) / 2
 
 
     with tf.variable_scope("vae_losses"):
@@ -154,6 +169,7 @@ def build_model (config, height, width, images, reset=True):
     model = FullModel( vae          = vae
                      , gen_images   = gen_images
                      , discrim_loss = discrim_loss
+                     , gen_loss     = gen_loss
                      , vae_loss     = vae_loss
                      )
 
@@ -174,15 +190,15 @@ def build_vae (config, width, height, images, vae_size=256, z_dim=10):
         print("  images", images.shape)
         flatten = tf.layers.flatten(images)
 
-        h1 = tf.layers.dense(flatten, vae_size)
-        h2 = tf.layers.dense(h1,      vae_size)
+        h1 = tf.layers.dense(flatten, vae_size, activation=tf.nn.softplus)
+        h2 = tf.layers.dense(h1,      vae_size, activation=tf.nn.softplus)
 
-        z_mean         = tf.layers.dense(h2, z_dim, activation=tf.nn.tanh)
-        z_log_sigma_sq = tf.layers.dense(h2, z_dim, activation=tf.nn.tanh)
+        z_mean         = tf.layers.dense(h2, z_dim)
+        z_log_sigma_sq = tf.layers.dense(h2, z_dim)
 
         vae = VaeModel( z_mean         = z_mean
-                    , z_log_sigma_sq = z_log_sigma_sq
-                    )
+                      , z_log_sigma_sq = z_log_sigma_sq
+                      )
 
         return vae
 

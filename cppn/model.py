@@ -39,7 +39,7 @@ def net (config, xs):
                            )
         print("  h:", h)
 
-    ys = tf.layers.dense(h, config.colours, activation=tf.nn.sigmoid)
+    ys   = tf.layers.dense(h, config.colours, activation=None)
     return ys
 
 
@@ -62,6 +62,7 @@ def build_model (config, height, width, reset=True):
     h          = tf.concat([xs, pixel_ones * z], axis = 2)
 
     ys   = tf.map_fn(lambda xs: net(config, xs), h)
+    ys   = tf.nn.sigmoid(ys)
     loss = tf.losses.mean_squared_error(labels=to_match, predictions=ys)
 
     # TODO: Because of the dependence on width/height here, this is wrong,

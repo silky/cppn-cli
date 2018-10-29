@@ -103,9 +103,15 @@ def train_gan (ctx, directory, server, config, base_log_dir="logs", log_director
 
     model = gan_model.build_model(config, height, width, next_batch, reset=False)
 
-    optim      = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
-    loss_op    = model.vae_loss + model.discrim_loss
-    train_step = optim.minimize(loss_op)
+    optim_d    = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
+    optim_g    = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
+    optim_vae  = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
+
+    loss_op = model.gen_loss + model.discrim_loss + model.vae_loss
+
+    train_d_step   = optim_d.minimize(model.discrim_loss)
+    train_g_step   = optim_g.minimize(model.gen_loss)
+    train_vae_step = optim_vae.minimize(model.vae_loss)
 
     merged   = tf.summary.merge_all()
 
@@ -125,7 +131,10 @@ def train_gan (ctx, directory, server, config, base_log_dir="logs", log_director
         writer = tf.summary.FileWriter(f"{summaries_dir}/train", sess.graph)
 
         while not sess.should_stop():
-            _, loss = sess.run( [ train_step, loss_op ] )
+            _, _, _, loss = sess.run( [ train_d_step
+                                      , train_g_step
+                                      , train_vae_step
+                                      , loss_op ] )
             if k % log_every == 0:
                 summaries = sess.run(merged)
                 writer.add_summary(summaries, k)
