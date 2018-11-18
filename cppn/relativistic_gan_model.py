@@ -119,6 +119,8 @@ def build_model (config, height, width, images, reset=True):
         print("gen_images:", gen_images)
 
 
+    sig_gen_images = tf.nn.sigmoid(gen_images)
+
     #
     # <- -> <- -> <- -> <- -> <- -> <- -> <- -> <- -> <- -> <- ->
     #
@@ -142,10 +144,12 @@ def build_model (config, height, width, images, reset=True):
         # discrim_loss = ( tf.reduce_mean((y_real - tf.reduce_mean(y_fake) - y) ** 2)
         #                + tf.reduce_mean((y_fake - tf.reduce_mean(y_real) + y) ** 2)
         #                ) / 2
+        # # discrim_loss = tf.Print(discrim_loss, [discrim_loss], "Discrim loss")
 
         # gen_loss = ( tf.reduce_mean((y_real - tf.reduce_mean(y_fake) + y) ** 2)
         #            + tf.reduce_mean((y_fake - tf.reduce_mean(y_real) - y) ** 2)
         #            ) / 2
+        # gen_loss = tf.Print(gen_loss, [gen_loss], "Discrim loss")
 
 
     with tf.variable_scope("vae_losses"):
@@ -155,11 +159,13 @@ def build_model (config, height, width, images, reset=True):
 
         reconstr_loss   = -tf.reduce_sum(flat_images * tf.log(1e-10 + flat_gen_images)
                         + (1 - flat_images) * tf.log(1e-10 + 1 - flat_gen_images), 1)
+        # reconstr_loss   = tf.Print(reconstr_loss, [reconstr_loss], "Reconstr loss")
 
         # Latent loss problematic
         latent_loss     = -0.5 * tf.reduce_sum(1 + vae.z_log_sigma_sq
                                                  - tf.square(vae.z_mean)
                                                  - tf.exp(vae.z_log_sigma_sq), 1)
+        # latent_loss     = tf.Print(latent_loss, [latent_loss], "Latent loss")
 
         reconstr_loss_m = tf.reduce_mean(reconstr_loss)  / pixels
         latent_loss_m   = tf.reduce_mean(latent_loss)    / pixels
@@ -174,11 +180,16 @@ def build_model (config, height, width, images, reset=True):
                      )
 
     tf.summary.image("images",          tf.concat([images, gen_images], axis=2))
-    tf.summary.scalar("vae_loss",       vae_loss)
-    tf.summary.scalar("reconstr_loss",  reconstr_loss_m)
-    tf.summary.scalar("latent_loss",    latent_loss_m)
-    tf.summary.scalar("discrim_loss",   discrim_loss)
-    tf.summary.scalar("total_loss",     vae_loss + discrim_loss)
+    tf.summary.scalar("vae_loss",       vae_loss, family="loss")
+    tf.summary.scalar("reconstr_loss",  reconstr_loss_m, family="loss")
+    tf.summary.scalar("latent_loss",    latent_loss_m, family="loss")
+    tf.summary.scalar("discrim_loss",   discrim_loss, family="loss")
+    tf.summary.scalar("gen_loss",       gen_loss, family="loss")
+    tf.summary.scalar("total_loss",     vae_loss + discrim_loss, family="loss")
+
+    tf.summary.histogram("z", zs, family="latents")
+    tf.summary.histogram("z_mean", vae.z_mean, family="latents")
+    tf.summary.histogram("z_log_sigma_sq", vae.z_log_sigma_sq, family="latents")
 
     return model
 
@@ -190,11 +201,11 @@ def build_vae (config, width, height, images, vae_size=256, z_dim=10):
         print("  images", images.shape)
         flatten = tf.layers.flatten(images)
 
-        h1 = tf.layers.dense(flatten, vae_size, activation=tf.nn.softplus)
-        h2 = tf.layers.dense(h1,      vae_size, activation=tf.nn.softplus)
+        h1 = tf.layers.dense(flatten, vae_size, activation=tf.nn.tanh)
+        h2 = tf.layers.dense(h1,      vae_size, activation=tf.nn.tanh)
 
-        z_mean         = tf.layers.dense(h2, z_dim)
-        z_log_sigma_sq = tf.layers.dense(h2, z_dim)
+        z_mean         = tf.layers.dense(h2, z_dim, activation=None)
+        z_log_sigma_sq = tf.layers.dense(h2, z_dim, activation=None)
 
         vae = VaeModel( z_mean         = z_mean
                       , z_log_sigma_sq = z_log_sigma_sq

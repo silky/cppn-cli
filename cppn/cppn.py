@@ -88,11 +88,17 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
 def train_gan (ctx, directory, server, config, base_log_dir="logs", log_directory=None):
     """ Train a CPPN on a given directory.
     """
-    height     = 64
-    width      = 64
-    epochs     = 3
-    batch_size = 1
-    lr         = 0.001
+
+    # TODO:
+    #   Plans:
+    #       - Remove the VAE.
+    #       - ...?
+    
+    height     = 32
+    width      = 32
+    epochs     = 30
+    batch_size = 3
+    lr         = 0.0001
     log_every  = 50
 
     dataset    = make_dataset(directory, height, width)
@@ -103,9 +109,9 @@ def train_gan (ctx, directory, server, config, base_log_dir="logs", log_director
 
     model = gan_model.build_model(config, height, width, next_batch, reset=False)
 
-    optim_d    = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
-    optim_g    = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
-    optim_vae  = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5, beta2=0.9)
+    optim_d    = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.8, beta2=0.95)
+    optim_g    = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.8, beta2=0.95)
+    optim_vae  = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.8, beta2=0.95)
 
     loss_op = model.gen_loss + model.discrim_loss + model.vae_loss
 
@@ -131,14 +137,20 @@ def train_gan (ctx, directory, server, config, base_log_dir="logs", log_director
         writer = tf.summary.FileWriter(f"{summaries_dir}/train", sess.graph)
 
         while not sess.should_stop():
-            _, _, _, loss = sess.run( [ train_d_step
-                                      , train_g_step
-                                      , train_vae_step
-                                      , loss_op ] )
+            _, _,  g_loss, d_loss = sess.run( [ train_d_step
+                                                        , train_g_step
+                                                        # , train_vae_step
+                                                        , model.gen_loss
+                                                        , model.discrim_loss
+                                                        # , model.vae_loss ] )
+                                                        ] )
             if k % log_every == 0:
+                # total_loss = g_loss + d_loss + v_loss
+                total_loss = g_loss + d_loss
                 summaries = sess.run(merged)
                 writer.add_summary(summaries, k)
-                print(f"{k}:  loss:", loss)
+                print(f"{k}:  loss: {total_loss}, gen: {g_loss}, disc: {d_loss}.")
+                # print(f"{k}:  loss: {total_loss}, gen: {g_loss}, disc: {d_loss}, vae: {v_loss}.")
             k += 1
 
     print("Done!")
