@@ -21,7 +21,7 @@ def discriminator (width, height):
     colours  = 3
     d_h_size = 10
 
-    images = tf.placeholder(tf.float32, shape = [ None, height, width coord_dims ])
+    images = tf.placeholder(tf.float32, shape = [ None, height, width, coord_dims ])
 
     c1 = tf.layers.conv2d(images, d_h_size, kernel_size=4, strides=2,
             use_bias=False)

@@ -66,7 +66,7 @@ def build_model (config, height, width):
     return model
 
 
-def get_input_data (config, height, width, start, end):
+def get_input_data (config, height, width, start=-1, end=1):
     x = np.linspace(start, end, num = width)
     y = np.linspace(start, end, num = height)
     return get_input_data_(config, x, y)

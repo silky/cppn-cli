@@ -29,7 +29,7 @@ def generate (z, height, width, config, out, server):
 
 
 
-def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, border, border_steps):
+def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, border=0, border_steps=0):
     """ Sample from a pre-trained model and emit an image.
     """
     with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
