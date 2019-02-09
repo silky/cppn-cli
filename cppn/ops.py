@@ -11,6 +11,8 @@ AFM = { "tanh":                 tf.nn.tanh
       , "relu":                 tf.nn.relu
       , "softplus":             tf.nn.softplus
       , "fugu-tanh":            lambda x: fugu(x, tf.tanh)
+      # Penalised-Tanh
+      , "ptanh":                lambda x: fugu(x, tf.tanh, lambda x1: 0.25 * tf.tanh(x1))
       , "fugu-sigmoid":         lambda x: fugu(x, tf.nn.sigmoid)
       , "fugu-double-sigmoid":  lambda x: fugu(x, tf.nn.sigmoid, lambda x: 1 - tf.nn.sigmoid(x))
       , "fugu-dropout-sigmoid": lambda x: fugu(x, lambda x1: tf.nn.dropout(x1, 0.5), lambda x: 1 - tf.nn.sigmoid(x))

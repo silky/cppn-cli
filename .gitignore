@@ -3,4 +3,7 @@
 logs/*
 scripts/*
 out/*
-result.json
+build/
+dist/
+*.png
+*.json
