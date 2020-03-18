@@ -6,4 +6,7 @@ out/*
 build/
 dist/
 *.png
+*.jpg
 *.json
+.ipynb_checkpoints/
+*.ipynb

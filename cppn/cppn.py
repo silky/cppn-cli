@@ -8,6 +8,7 @@ import pickle
 import json
 import uuid
 from tensorflow.core.protobuf import config_pb2
+import colorsys 
 
 def make_session (server):
     config = config_pb2.ConfigProto(isolate_session_state=True)
@@ -24,12 +25,15 @@ def generate (z, height, width, config, out, server):
         sess.run(tf.global_variables_initializer())
         ys = model.forward(sess, config, net, z, height, width)
 
-    print(f"z = {z}")
+    # print(f"z = {z}")
+    # f  = np.vectorize( lambda x: np.array(colorsys.yiq_to_rgb(*x)), otypes=[np.float64], signature="(a)->(a)")
+    # ys = f(ys)
     sp.imsave(out, ys)
 
 
 
-def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, border=0, border_steps=0):
+def sample (config, checkpoint_dir, height, width, server, out, z, z_steps,
+        dist=0, border=0, border_steps=0):
     """ Sample from a pre-trained model and emit an image.
     """
     with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
@@ -46,7 +50,11 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
     if z_steps > 0:
         # interpolate from z to zn
         zn = np.random.normal(-1, 1, size=config.z_dim)
-        # zs = np.
+
+        # Use 'dist' to say how far we stray from the trained vector z.
+        # When dist = 0, zn = z
+        # when dist = 1, zn = zn
+        zn = zn * dist + (1 - dist) * z
 
         z_ = lambda t: t * z + (1 - t) * zn
         zs = [z_(t) for t in np.linspace(0, 1, z_steps)]
@@ -62,25 +70,25 @@ def sample (config, checkpoint_dir, height, width, server, out, z, z_steps, bord
         saver.restore(sess, checkpoint)
 
         if z_steps > 0:
-            frames = [ model.forward(sess, config, net, z_, height, width, border) for z_ in zs ]
+            frames = ( model.forward(sess, config, net, z_, height, width, border) for z_ in zs )
         else:
             if border_steps > 0:
                 borders = np.linspace(0, border, num = border_steps)
-                frames  = [ model.forward(sess, config, net, z, height, width, b) for b in borders ]
+                frames  = ( model.forward(sess, config, net, z, height, width, b) for b in borders )
                 frames  = reversed(frames)
             else:
                 ys = model.forward(sess, config, net, z, height, width, border=border)
 
-    with open(f"{out}.json", "w") as f:
-        config_data["z"]              = config_data["z"].tolist()
-        config_data["checkpoint_dir"] = checkpoint_dir
-        json.dump(config_data, f)
+        with open(f"{out}.json", "w") as f:
+            config_data["z"]              = config_data["z"].tolist()
+            config_data["checkpoint_dir"] = checkpoint_dir
+            json.dump(config_data, f)
 
-    if z_steps > 0 or border_steps > 0:
-        for k, ys in enumerate(frames):
-            sp.imsave(out + "/%05d.png" % k, ys)
-    else:
-        sp.imsave(out, ys)
+        if z_steps > 0 or border_steps > 0:
+            for k, ys in enumerate(frames):
+                sp.imsave(out + "/%05d.png" % k, ys)
+        else:
+            sp.imsave(out, ys)
 
 
 def train_matching (ctx, image, z, server, config, lr, steps, log_every, base_log_dir, log_directory=None):

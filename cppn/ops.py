@@ -9,7 +9,9 @@ def fugu (x, f, g=lambda x: x, point=0):
 AFM = { "tanh":                 tf.nn.tanh
       , "selu":                 tf.nn.selu
       , "relu":                 tf.nn.relu
+      , "relu6":                tf.nn.relu6
       , "softplus":             tf.nn.softplus
+      , "softsign":             tf.nn.softsign
       , "fugu-tanh":            lambda x: fugu(x, tf.tanh)
       # Penalised-Tanh
       , "ptanh":                lambda x: fugu(x, tf.tanh, lambda x1: 0.25 * tf.tanh(x1))

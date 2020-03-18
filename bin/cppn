@@ -93,9 +93,10 @@ def keep_training(ctx, checkpoint_dir, server, image, steps, base_logdir, log_ev
 @click.option("--out",     type=str, required=True)
 @click.option("--z",       type=str, default=None)
 @click.option("--z_steps", type=int, default=0)
+@click.option("--dist",    type=float, default=1)
 @click.option("--border",  type=float, default=0)
 @click.option("--border_steps",  type=int, default=0)
-def sample(ctx, checkpoint_dir, height, width, server, out, z, z_steps, border, border_steps):
+def sample(ctx, checkpoint_dir, height, width, server, out, z, z_steps, dist, border, border_steps):
     """ Sample an image from an existing model.
     """
     with open(f"{checkpoint_dir}/config.pkl", "rb") as f:
@@ -111,6 +112,7 @@ def sample(ctx, checkpoint_dir, height, width, server, out, z, z_steps, border, 
             out, 
             z, 
             z_steps,
+            dist,
             border,
             border_steps
             )
