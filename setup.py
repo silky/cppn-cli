@@ -8,7 +8,7 @@ setup(name="cppn-cli",
         author_email="noonsilk@gmail.com",
         license="MIT",
         install_requires=[
-            "tensorflow==1.8.0",
+            "tensorflow==1.15.2",
             "numpy==1.14.3",
             "Pillow",
             "GPy==1.9.2",
